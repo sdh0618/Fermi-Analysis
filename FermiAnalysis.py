@@ -12,6 +12,8 @@ import make4FGLxml
 
 class FermiAnalysis:
 
+
+
     def __init__(self, roi, path, evfile, scfile,
                  zmax=90, tmin=239557417, tmax=618049985, 
                  emin=500, emax=500000, ra=None, dec=None, lon=None, lat=None,
@@ -189,7 +191,7 @@ class FermiAnalysis:
         GIndexFree (bool) -- optional, the Galactic diffuse is given a power-law spectral shape but the by default the index is frozen, setting this flag to True allows that to be free for additional freedom in diffuse fit
         oldNames (bool) -- optional, flag to use the naming convention from make1FGLxml.py and make2FGLxml.py with a leading underscore and no spaces
         '''        
-        make4FGLxml.srcList(sources, ft1=ft1 or self.evfile_filterd_gti, out=out or gc.srcmdl, DRversion=DRversion).makeModel(
+        make4FGLxml.srcList(sources, ft1=ft1 or self.evfile_filterd_gti, out=out or self.srcmdl, DRversion=DRversion).makeModel(
             GDfile=GDfile, GDname=GDname, ISOfile=ISOfile, ISOname=ISOname, normsOnly=normsOnly, 
             extDir=extDir, radLim=radLim, maxRad=maxRad, ExtraRad=ExtraRad, 
             sigFree=sigFree, varFree=varFree, psForce=psForce, E2CAT=E2CAT, 
