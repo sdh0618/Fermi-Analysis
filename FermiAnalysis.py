@@ -10,11 +10,15 @@ from astropy.io import fits
 
 import make4FGLxml
 
+import pyLikelihood
+from BinnedAnalysis import *
+
 class FermiAnalysis:
 
 
 
     def __init__(self, roi, path, evfile, scfile,
+                 evclass=128, evtype=3, irfs='P8R3_SOURCE_V3',
                  zmax=90, tmin=239557417, tmax=618049985, 
                  emin=500, emax=500000, ra=None, dec=None, lon=None, lat=None,
                  width=40, binsz=0.2, enumbins=None, ebinsperdec=8):
@@ -23,6 +27,10 @@ class FermiAnalysis:
         self.path = path
         self.evfile = evfile
         self.scfile = scfile
+
+        self.evclass = evclass
+        self.evtype = evtype
+        self.irfs = irfs
         
         self.zmax = zmax
         self.tmin = tmin
@@ -55,13 +63,13 @@ class FermiAnalysis:
         self.srcmdl = self.path + self.roi + '_srcmdl.xml'
         self.srcmaps = self.path + self.roi + '_srcmaps.fits'
     
-    def gtselect(self, evclass=128, evtype=3, 
+    def gtselect(self, evclass=None, evtype=None, 
                  ra=None, dec=None, rad=None, emin=None, emax=None, zmax=None, tmin=None, tmax=None, 
                  infile=None, outfile=None,
                  chatter=4, clobber='yes', debug='no'):
                 
-        gt_apps.filter['evclass'] = evclass #Source=128, Clean=256, ultraclean=512, UltraCleanVeto=1024
-        gt_apps.filter['evtype'] = evtype # (front + back)=3, front=1, back=2 PSF0=4, PSF1=8, PSF2=16, PSF3=32 (PSF1+PSF2+PSF3)=8+16+32=56
+        gt_apps.filter['evclass'] = evclass or self.evclass #Source=128, Clean=256, ultraclean=512, UltraCleanVeto=1024
+        gt_apps.filter['evtype'] = evtype or self.evtype # (front + back)=3, front=1, back=2 PSF0=4, PSF1=8, PSF2=16, PSF3=32 (PSF1+PSF2+PSF3)=8+16+32=56
         gt_apps.filter['ra'] = ra or self.ra
         gt_apps.filter['dec'] = dec or self.dec
         gt_apps.filter['rad'] = rad or np.sqrt(2)*self.width/2
@@ -86,10 +94,10 @@ class FermiAnalysis:
         gt_apps.maketime['roicut'] = 'no'
         gt_apps.maketime['evfile'] = evfile or self.evfile_filterd
         gt_apps.maketime['outfile'] = outfile or self.evfile_filterd_gti
-        gt_apps.maketime['overwrite'] = 'no'
-        gt_apps.maketime['chatter'] = 4
-        gt_apps.maketime['clobber'] = 'yes'
-        gt_apps.maketime['debug'] = 'no'
+        gt_apps.maketime['overwrite'] = overwrite
+        gt_apps.maketime['chatter'] = chatter
+        gt_apps.maketime['clobber'] = clobber
+        gt_apps.maketime['debug'] = debug
         gt_apps.maketime.run()
     
     def gtbin(self, algorithm='CCUBE', evfile=None, outfile=None, scfile=None,
@@ -98,25 +106,25 @@ class FermiAnalysis:
               ebinalg='LOG', emin=None, emax=None, enumbins=None,
               chatter=4, clobber='yes', debug='no'):
                 
-        gt_apps.evtbin['algorithm'] = 'CCUBE'
+        gt_apps.evtbin['algorithm'] = algorithm
         gt_apps.evtbin['evfile'] = evfile or self.evfile_filterd_gti
         gt_apps.evtbin['outfile'] = outfile or self.cmap
         gt_apps.evtbin['scfile'] = scfile or self.scfile
         gt_apps.evtbin['nxpix'] = nxpix or int(self.width/self.binsz)
         gt_apps.evtbin['nypix'] = nypix or int(self.width/self.binsz)
         gt_apps.evtbin['binsz'] = binsz or self.binsz
-        gt_apps.evtbin['coordsys'] = 'GAL'
+        gt_apps.evtbin['coordsys'] = coordsys
         gt_apps.evtbin['xref'] = xref or self.lon
         gt_apps.evtbin['yref'] = yref or self.lat
-        gt_apps.evtbin['axisrot'] = 0
-        gt_apps.evtbin['proj'] = 'CAR'
-        gt_apps.evtbin['ebinalg'] = 'LOG'
+        gt_apps.evtbin['axisrot'] = axisrot
+        gt_apps.evtbin['proj'] = proj
+        gt_apps.evtbin['ebinalg'] = ebinalg
         gt_apps.evtbin['emin'] = emin or self.emin
         gt_apps.evtbin['emax'] = emax or self.emax
         gt_apps.evtbin['enumbins'] = enumbins or self.enumbins 
-        gt_apps.evtbin['chatter'] = 4
-        gt_apps.evtbin['clobber'] = 'yes'
-        gt_apps.evtbin['debug'] = 'no'
+        gt_apps.evtbin['chatter'] = chatter
+        gt_apps.evtbin['clobber'] = clobber
+        gt_apps.evtbin['debug'] = debug
         gt_apps.evtbin.run()
         
     def gtltcube(self, zmax=None, dcostheta=0.025, binsz=1,
@@ -129,40 +137,40 @@ class FermiAnalysis:
         gt_apps.expCube['scfile'] = scfile or self.scfile
         gt_apps.expCube['outfile'] = outfile or self.ltcube
         gt_apps.expCube['zmax'] = zmax or self.zmax
-        gt_apps.expCube['dcostheta'] = 0.025
-        gt_apps.expCube['binsz'] = 1
-        gt_apps.expCube['chatter'] = 4
-        gt_apps.expCube['clobber'] = 'yes'
-        gt_apps.expCube['debug'] = 'no'
+        gt_apps.expCube['dcostheta'] = dcostheta
+        gt_apps.expCube['binsz'] = binsz
+        gt_apps.expCube['chatter'] = chatter
+        gt_apps.expCube['clobber'] = clobber
+        gt_apps.expCube['debug'] = debug
         gt_apps.expCube.run()
         
-    def gtexpcube2(self, irfs='P8R3_SOURCE_V3', evtype=3,
+    def gtexpcube2(self, irfs=None, evtype=None,
                    infile=None, outfile=None, cmap='none',
                    nxpix=None, nypix=None, binsz=None, xref=None, yref=None,
-                   coordsys='GAL', lon=None, lat=None, axisor=0, proj='CAR',
+                   coordsys='GAL', lon=None, lat=None, axisrot=0, proj='CAR',
                    ebinalg='LOG', emin=None, emax=None, enumbins=None,
                    chatter=4, clobber='yes', debug='no'):
         
-        gt_apps.gtexpcube2['irfs'] = 'P8R3_SOURCE_V3'
-        gt_apps.gtexpcube2['evtype'] = 3
+        gt_apps.gtexpcube2['irfs'] = irfs or self.irfs
+        gt_apps.gtexpcube2['evtype'] = evtype or self.evtype
         gt_apps.gtexpcube2['infile'] = infile or self.ltcube
         gt_apps.gtexpcube2['outfile'] = outfile or self.bexpmap
         gt_apps.gtexpcube2['cmap'] = cmap
         gt_apps.gtexpcube2['nxpix'] = int(360/(binsz or self.binsz))
         gt_apps.gtexpcube2['nypix'] = int(180/(binsz or self.binsz))
         gt_apps.gtexpcube2['binsz'] = binsz or self.binsz
-        gt_apps.gtexpcube2['coordsys'] = 'GAL'
+        gt_apps.gtexpcube2['coordsys'] = coordsys
         gt_apps.gtexpcube2['xref'] = lon or self.lon
         gt_apps.gtexpcube2['yref'] = lat or self.lat
-        gt_apps.gtexpcube2['axisrot'] = 0
-        gt_apps.gtexpcube2['proj'] = 'CAR'
-        gt_apps.gtexpcube2['ebinalg'] = 'LOG'
+        gt_apps.gtexpcube2['axisrot'] = axisrot
+        gt_apps.gtexpcube2['proj'] = proj
+        gt_apps.gtexpcube2['ebinalg'] = ebinalg
         gt_apps.gtexpcube2['emin'] = emin or self.emin
         gt_apps.gtexpcube2['emax'] = emax or self.emax
         gt_apps.gtexpcube2['enumbins'] = enumbins or self.enumbins
-        gt_apps.gtexpcube2['chatter'] = 4
-        gt_apps.gtexpcube2['clobber'] = 'yes'
-        gt_apps.gtexpcube2['debug'] = 'no'
+        gt_apps.gtexpcube2['chatter'] = chatter
+        gt_apps.gtexpcube2['clobber'] = clobber
+        gt_apps.gtexpcube2['debug'] = debug
         gt_apps.gtexpcube2.run()
 
     def makexml(self, sources, ft1=None, out=None, DRversion=3,
@@ -197,19 +205,33 @@ class FermiAnalysis:
             sigFree=sigFree, varFree=varFree, psForce=psForce, E2CAT=E2CAT, 
             makeRegion=makeRegion, GIndexFree=GIndexFree, wd=wd, oldNames=oldNames)
         
-    def gtsrcmaps(self, evtype=3, irfs='P8R3_SOURCE_V3', ptsrc='yes',
+    def gtsrcmaps(self, evtype=None, irfs=None, ptsrc='yes',
                   scfile=None, expcube=None, cmap=None, srcmdl=None, bexpmap=None, outfile=None,
                   chatter=4, clobber='yes', debug='no'):
+
         gt_apps.srcMaps['scfile'] = scfile or self.scfile
         gt_apps.srcMaps['expcube'] = expcube or self.ltcube
         gt_apps.srcMaps['cmap'] = cmap or self.cmap
         gt_apps.srcMaps['srcmdl'] = srcmdl or self.srcmdl
         gt_apps.srcMaps['bexpmap'] = bexpmap or self.bexpmap
         gt_apps.srcMaps['outfile'] = outfile or self.srcmaps
-        gt_apps.srcMaps['evtype'] = evtype
-        gt_apps.srcMaps['irfs'] = 'P8R3_SOURCE_V3'
+        gt_apps.srcMaps['evtype'] = evtype or self.evtype
+        gt_apps.srcMaps['irfs'] = irfs or self.irfs
         gt_apps.srcMaps['ptsrc'] = ptsrc
-        gt_apps.srcMaps['chatter'] = 4
-        gt_apps.srcMaps['clobber'] = 'yes'
-        gt_apps.srcMaps['debug'] = 'no'
+        gt_apps.srcMaps['chatter'] = chatter
+        gt_apps.srcMaps['clobber'] = clobber
+        gt_apps.srcMaps['debug'] = debug
         gt_apps.srcMaps.run()
+
+    # def binned_obj(self, srcMaps=None, expCube=None, binnedExpMap=None, irfs=None, phased_expmap=None):
+
+    #     return BinnedObs(srcMaps=srcMaps or self.srcMaps, expCube=expCube or self.ltcube, binnedExpMap=binnedExpMap or self.bexpmap, irfs=irfs or self.irfs, phased_expmap=phased_expmap)
+
+    # def like(self, binnedData, srcModel=None, optimizer='Drmngb', use_bl2=False, verbosity=0, psfcorr=True, wmap=None, config=None, delete_local_fixed=False):
+
+    #     return
+        
+    #     self.like = BinnedAnalysis(self.obs, srcModel=srcModel or self.srcmdl, optimizer='Drmngb', use_bl2=False, verbosity=0, psfcorr=True, wmap=None, config=None, delete_local_fixed=False)
+            
+            
+    #         obs, srcModel=virgo.srcmdl, optimizer='NewMinuit', config=None)
