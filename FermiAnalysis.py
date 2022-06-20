@@ -156,8 +156,8 @@ class FermiAnalysis:
         gt_apps.gtexpcube2['infile'] = infile or self.ltcube
         gt_apps.gtexpcube2['outfile'] = outfile or self.bexpmap
         gt_apps.gtexpcube2['cmap'] = cmap
-        gt_apps.gtexpcube2['nxpix'] = int(360/(binsz or self.binsz))
-        gt_apps.gtexpcube2['nypix'] = int(180/(binsz or self.binsz))
+        gt_apps.gtexpcube2['nxpix'] = nxpix or (int(360/(binsz or self.binsz)))
+        gt_apps.gtexpcube2['nypix'] = nypix or (int(180/(binsz or self.binsz)))
         gt_apps.gtexpcube2['binsz'] = binsz or self.binsz
         gt_apps.gtexpcube2['coordsys'] = coordsys
         gt_apps.gtexpcube2['xref'] = lon or self.lon
